@@ -27,18 +27,17 @@ def extract(url):
 def transform(text):
     logging.info("transform started")
     # ignore the first line - header
-    lines = text.split("\n")
+    lines = text["list"]
     logging.info("transform done")
     return lines
 
-
 def load(lines):
-    logging.info("load started")
     cur = get_Redshift_connection()
     sql = "BEGIN;DELETE FROM kdhnate222.weather_forecast;"
-    for l in lines:
-        if l != '':
-            (day, min, max) = l.split(",")
+    for r in lines:
+            day = datetime.fromtimestamp(r["dt"]).strftime('%Y-%m-%d')
+            min = r["main"]["temp_min"]
+            max = r["main"]["temp_max"]
             sql += f"INSERT INTO kdhnate222.weather_forecast VALUES ('{day}', '{min}', '{max}');"
     sql += "END;"
     cur.execute(sql)
@@ -47,7 +46,7 @@ def load(lines):
 
 
 def etl():
-    link = "https://api.openweathermap.org/data/2.5/onecall?lat={37.541}&lon={126.986}&exclude={daily}&appid={7ffcfc194c9aca441bad340129790056}"
+    link = "http://api.openweathermap.org/data/2.5/forecast?lat=37.541&lon=126.986&units=metric&appid=7ffcfc194c9aca441bad340129790056"
     data = extract(link)
     lines = transform(data)
     load(lines)
@@ -56,8 +55,8 @@ def etl():
 dag_open_weather = DAG(
 	dag_id = 'open_weather_assignment',
 	catchup = False,
-	start_date = datetime(2022,8,18), # 날짜가 미래인 경우 실행이 안됨
-	schedule_interval = '0 * * * *')  # 적당히 조절
+	start_date = datetime(2022,8,20), # 날짜가 미래인 경우 실행이 안됨
+	schedule_interval = '0 2 * * *')
 
 task = PythonOperator(
 	task_id = 'perform_etl',
